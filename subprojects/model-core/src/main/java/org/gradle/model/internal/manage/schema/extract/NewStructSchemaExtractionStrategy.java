@@ -68,7 +68,7 @@ public class NewStructSchemaExtractionStrategy implements ModelSchemaExtractionS
         Iterable<WeaklyTypeReferencingMethod<?, ?>> nonPropertyMethods = Iterables.transform(nonPropertyMethodsBuilder.build(), new Function<Method, WeaklyTypeReferencingMethod<?, ?>>() {
             @Override
             public WeaklyTypeReferencingMethod<?, ?> apply(Method method) {
-                return WeaklyTypeReferencingMethod.of(ModelType.declaringType(method), ModelType.returnType(method), method);
+                return WeaklyTypeReferencingMethod.of(method);
             }
         });
 
@@ -161,7 +161,7 @@ public class NewStructSchemaExtractionStrategy implements ModelSchemaExtractionS
         ImmutableMap.Builder<PropertyAccessorRole, WeaklyTypeReferencingMethod<?, ?>> accessors = ImmutableMap.builder();
         for (PropertyAccessorExtractionContext accessor : propertyContext.getAccessors()) {
             Method method = accessor.getMostSpecificDeclaration();
-            WeaklyTypeReferencingMethod<Object, Object> methodRef = WeaklyTypeReferencingMethod.of(ModelType.declaringType(method), ModelType.returnType(method), method);
+            WeaklyTypeReferencingMethod<?, ?> methodRef = WeaklyTypeReferencingMethod.of(method);
             accessors.put(accessor.getRole(), methodRef);
         }
         NewModelProperty<P> property = new NewModelProperty<P>(
