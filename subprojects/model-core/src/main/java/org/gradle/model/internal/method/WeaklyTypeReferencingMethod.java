@@ -17,8 +17,7 @@
 package org.gradle.model.internal.method;
 
 import com.google.common.base.Function;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Iterables;
+import com.google.common.collect.*;
 import org.apache.commons.lang.builder.EqualsBuilder;
 import org.apache.commons.lang.builder.HashCodeBuilder;
 import org.gradle.api.GradleException;
@@ -31,8 +30,9 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.util.Arrays;
+import java.util.Comparator;
 
-public class WeaklyTypeReferencingMethod<T, R> {
+public class WeaklyTypeReferencingMethod<T, R> implements Comparable<WeaklyTypeReferencingMethod<T, ?>> {
 
     private final ModelType<T> declaringType;
     private final ModelType<R> returnType;
@@ -142,5 +142,37 @@ public class WeaklyTypeReferencingMethod<T, R> {
                 .append(name, other.name)
                 .append(paramTypes, other.paramTypes)
                 .isEquals();
+    }
+
+    @Override
+    public int compareTo(WeaklyTypeReferencingMethod<T, ?> o) {
+        Method m1 = getMethod();
+        Method m2 = o.getMethod();
+        return ComparisonChain.start()
+            .compare(m1.getName(), m2.getName())
+            .compare(m1.getReturnType().getName(), m2.getReturnType().getName())
+            .compare(m1.getParameterTypes(), m2.getParameterTypes(), new Comparator<Class<?>[]>() {
+                @Override
+                public int compare(Class<?>[] o1, Class<?>[] o2) {
+                    int result = 0;
+                    UnmodifiableIterator<Class<?>> i1 = Iterators.forArray(o1);
+                    UnmodifiableIterator<Class<?>> i2 = Iterators.forArray(o2);
+                    while (i1.hasNext() && i2.hasNext()) {
+                        result = i1.next().getName().compareTo(i2.next().getName());
+                        if (result != 0) {
+                            break;
+                        }
+                    }
+                    if (result == 0) {
+                        if (i1.hasNext()) {
+                            result = 1;
+                        } else {
+                            result = -1;
+                        }
+                    }
+                    return result;
+                }
+            })
+            .result();
     }
 }

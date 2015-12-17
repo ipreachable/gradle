@@ -20,6 +20,7 @@ import com.google.common.collect.ImmutableSet;
 import org.gradle.api.Named;
 import org.gradle.api.Nullable;
 import org.gradle.model.internal.manage.schema.ModelProperty;
+import org.gradle.model.internal.manage.schema.NewModelProperty;
 import org.gradle.model.internal.manage.schema.extract.*;
 import org.gradle.platform.base.Variant;
 
@@ -48,6 +49,31 @@ public class VariantAspectExtractionStrategy implements ModelSchemaAspectExtract
             return null;
         }
         return new ModelSchemaAspectExtractionResult(new VariantAspect(dimensions));
+    }
+
+    @Nullable
+    @Override
+    public ModelSchemaAspectExtractionResult extractNew(ModelSchemaExtractionContext<?> extractionContext, final Iterable<NewModelPropertyExtractionResult<?>> propertyResults) {
+        ImmutableSet.Builder<NewModelProperty<?>> dimensionsBuilder = ImmutableSet.builder();
+        for (NewModelPropertyExtractionResult<?> propertyResult : propertyResults) {
+            NewModelProperty<?> property = propertyResult.getProperty();
+            for (PropertyAccessorExtractionContext getter : propertyResult.getGetters()) {
+                if (getter.isAnnotationPresent(Variant.class)) {
+                    Class<?> propertyType = property.getType().getRawClass();
+                    if (!String.class.equals(propertyType) && !Named.class.isAssignableFrom(propertyType)) {
+                        // Annotations on non-String and non-Named properties are ignored
+                        continue;
+                    }
+                    dimensionsBuilder.add(property);
+                }
+            }
+            // Annotations on setters are silently ignored
+        }
+        ImmutableSet<NewModelProperty<?>> dimensions = dimensionsBuilder.build();
+        if (dimensions.isEmpty()) {
+            return null;
+        }
+        return new ModelSchemaAspectExtractionResult(new NewVariantAspect(dimensions));
     }
 
     protected InvalidManagedModelElementTypeException invalidProperty(ModelSchemaExtractionContext<?> extractionContext, ModelProperty<?> property, String message) {

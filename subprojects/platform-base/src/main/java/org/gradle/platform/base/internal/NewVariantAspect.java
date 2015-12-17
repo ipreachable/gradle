@@ -14,16 +14,22 @@
  * limitations under the License.
  */
 
-package org.gradle.model.internal.manage.schema.extract;
+package org.gradle.platform.base.internal;
 
-import org.gradle.api.Nullable;
+import com.google.common.collect.ImmutableSet;
+import org.gradle.model.internal.manage.schema.NewModelProperty;
+import org.gradle.model.internal.manage.schema.extract.ModelSchemaAspect;
 
-import java.util.List;
+import java.util.Set;
 
-public interface ModelSchemaAspectExtractionStrategy {
-    @Nullable
-    ModelSchemaAspectExtractionResult extract(ModelSchemaExtractionContext<?> extractionContext, List<ModelPropertyExtractionResult<?>> propertyResults);
+public class NewVariantAspect implements ModelSchemaAspect {
+    private final Set<NewModelProperty<?>> dimensions;
 
-    @Nullable
-    ModelSchemaAspectExtractionResult extractNew(ModelSchemaExtractionContext<?> extractionContext, Iterable<NewModelPropertyExtractionResult<?>> propertyResults);
+    public NewVariantAspect(Set<NewModelProperty<?>> dimensions) {
+        this.dimensions = ImmutableSet.copyOf(dimensions);
+    }
+
+    public Set<NewModelProperty<?>> getDimensions() {
+        return dimensions;
+    }
 }

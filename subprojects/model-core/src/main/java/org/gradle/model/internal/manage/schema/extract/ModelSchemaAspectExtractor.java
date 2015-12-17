@@ -44,4 +44,15 @@ public class ModelSchemaAspectExtractor {
         }
         return aspects;
     }
+
+    public <T> List<ModelSchemaAspect> extract(ModelSchemaExtractionContext<T> extractionContext, Iterable<NewModelPropertyExtractionResult<?>> propertyResults) {
+        List<ModelSchemaAspect> aspects = Lists.newArrayList();
+        for (ModelSchemaAspectExtractionStrategy strategy : strategies) {
+            ModelSchemaAspectExtractionResult result = strategy.extractNew(extractionContext, propertyResults);
+            if (result != null) {
+                aspects.add(result.getAspect());
+            }
+        }
+        return aspects;
+    }
 }

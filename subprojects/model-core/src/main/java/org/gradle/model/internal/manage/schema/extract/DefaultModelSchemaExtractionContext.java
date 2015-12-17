@@ -34,7 +34,7 @@ public class DefaultModelSchemaExtractionContext<T> implements ModelSchemaExtrac
     private ModelSchema<T> result;
     private final List<DefaultModelSchemaExtractionContext<?>> children = Lists.newArrayList();
 
-    private DefaultModelSchemaExtractionContext(DefaultModelSchemaExtractionContext<?> parent, ModelType<T> type, String description, Action<? super ModelSchema<T>> validator) {
+    DefaultModelSchemaExtractionContext(DefaultModelSchemaExtractionContext<?> parent, ModelType<T> type, String description, Action<? super ModelSchema<T>> validator) {
         this.parent = parent;
         this.type = type;
         this.description = description;

@@ -42,6 +42,7 @@ import java.util.List;
 public abstract class ModelType<T> {
 
     public static final ModelType<Object> UNTYPED = ModelType.of(Object.class);
+    public static final ModelType<Void> VOID = ModelType.of(Void.class);
 
     private final TypeWrapper wrapper;
 
@@ -64,6 +65,10 @@ public abstract class ModelType<T> {
 
     public static <T> ModelType<T> returnType(Method method) {
         return new Simple<T>(method.getGenericReturnType());
+    }
+
+    public static <T> ModelType<T> declaringType(Method method) {
+        return new Simple<T>(method.getDeclaringClass());
     }
 
     @Nullable
