@@ -17,7 +17,7 @@
 dependencies {
     compile libraries.groovy
     compile libraries.commons_io
-    compile project(':core')
+    compile project(":core")
     compile project(":platformBase")
     compile project(":diagnostics")
 

@@ -15,7 +15,7 @@
  */
 
 package org.gradle.jvm.test
-import groovy.transform.NotYetImplemented
+
 import org.gradle.integtests.fixtures.AbstractIntegrationSpec
 import org.gradle.integtests.fixtures.DefaultTestExecutionResult
 import org.hamcrest.Matchers
@@ -246,10 +246,6 @@ class JUnitStandaloneTestExecutionIntegrationTest extends AbstractIntegrationSpe
         executedAndNotSkipped(suites.collect { ":${it}BinaryTest"} as String[])
     }
 
-
-    @NotYetImplemented
-    // this has been deferred to a later story, where test binaries will
-    // be segregated from "regular" binaries
     def "assemble does not compile nor run test suite"() {
         given:
         applyJUnitPlugin()
@@ -266,7 +262,6 @@ class JUnitStandaloneTestExecutionIntegrationTest extends AbstractIntegrationSpe
 
         then:
         notExecuted ':compileMyTestBinaryMyTestJava', ':myTestBinaryTest'
-
     }
 
     def "should fail if a library attempts to depend on a test suite"() {
@@ -553,7 +548,7 @@ class JUnitStandaloneTestExecutionIntegrationTest extends AbstractIntegrationSpe
     private void testSuiteComponent(SourceSetConfiguration config = SourceSetConfiguration.EXPLICIT_NO_DEPS) {
         buildFile << """
             model {
-                components {
+                testSuites {
                     myTest(JUnitTestSuiteSpec) ${config.configuration}
                 }
             }
