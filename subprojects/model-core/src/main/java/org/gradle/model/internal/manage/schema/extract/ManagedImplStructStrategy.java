@@ -20,7 +20,10 @@ import com.google.common.base.Equivalence;
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.base.Predicate;
-import com.google.common.collect.*;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableSortedSet;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
 import org.gradle.api.Action;
 import org.gradle.api.Named;
 import org.gradle.internal.reflect.MethodDescription;
@@ -29,11 +32,17 @@ import org.gradle.model.Unmanaged;
 import org.gradle.model.internal.manage.schema.*;
 import org.gradle.model.internal.type.ModelType;
 
-import java.lang.reflect.*;
-import java.util.*;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
 
 import static org.gradle.model.internal.manage.schema.extract.ModelSchemaUtils.*;
-import static org.gradle.model.internal.manage.schema.extract.MethodType.*;
+import static org.gradle.model.internal.manage.schema.extract.PropertyAccessorRole.*;
 
 public class ManagedImplStructStrategy extends StructSchemaExtractionStrategySupport {
 
@@ -142,7 +151,7 @@ public class ManagedImplStructStrategy extends StructSchemaExtractionStrategySup
     protected void validateMethodDeclarationHierarchy(ModelSchemaExtractionContext<?> context, CandidateMethods candidateMethods) {
         for (String methodName : candidateMethods.methodNames()) {
             Collection<Equivalence.Wrapper<Method>> handledOverridden = Lists.newArrayList();
-            if (!MethodType.isPropertyMethodName(methodName)) {
+            if (!PropertyAccessorRole.isPropertyMethodName(methodName)) {
                 Map<Equivalence.Wrapper<Method>, Collection<Method>> overridden = candidateMethods.overriddenMethodsNamed(methodName);
                 if (!overridden.isEmpty()) {
                     handleOverriddenMethods(context, overridden.values());
@@ -216,7 +225,7 @@ public class ManagedImplStructStrategy extends StructSchemaExtractionStrategySup
     @Override
     protected void validateProperty(ModelSchemaExtractionContext<?> context, ModelPropertyExtractionContext property) {
         PropertyAccessorExtractionContext mergedGetter = property.mergeGetters();
-        PropertyAccessorExtractionContext setter = property.getSetter();
+        PropertyAccessorExtractionContext setter = property.getAccessor(SETTER);
         if (setter != null) {
             Method mostSpecificSetter = setter.getMostSpecificDeclaration();
             if (mergedGetter == null) {

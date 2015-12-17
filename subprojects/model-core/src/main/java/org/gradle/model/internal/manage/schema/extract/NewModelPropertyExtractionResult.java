@@ -16,33 +16,23 @@
 
 package org.gradle.model.internal.manage.schema.extract;
 
-import com.google.common.collect.ImmutableList;
-import org.gradle.api.Nullable;
+import com.google.common.collect.ImmutableSet;
 import org.gradle.model.internal.manage.schema.NewModelProperty;
-
-import java.util.List;
 
 public class NewModelPropertyExtractionResult<T> {
     private final NewModelProperty<T> property;
-    private final List<PropertyAccessorExtractionContext> getters;
-    private final PropertyAccessorExtractionContext setter;
+    private final Iterable<PropertyAccessorExtractionContext> accessors;
 
-    public NewModelPropertyExtractionResult(NewModelProperty<T> property, Iterable<PropertyAccessorExtractionContext> getters, @Nullable PropertyAccessorExtractionContext setter) {
+    public NewModelPropertyExtractionResult(NewModelProperty<T> property, Iterable<PropertyAccessorExtractionContext> accessors) {
         this.property = property;
-        this.getters = ImmutableList.copyOf(getters);
-        this.setter = setter;
+        this.accessors = ImmutableSet.copyOf(accessors);
     }
 
     public NewModelProperty<T> getProperty() {
         return property;
     }
 
-    public List<PropertyAccessorExtractionContext> getGetters() {
-        return getters;
-    }
-
-    @Nullable
-    public PropertyAccessorExtractionContext getSetter() {
-        return setter;
+    public Iterable<PropertyAccessorExtractionContext> getAccessors() {
+        return accessors;
     }
 }

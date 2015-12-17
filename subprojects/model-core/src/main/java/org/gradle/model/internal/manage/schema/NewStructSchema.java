@@ -24,6 +24,8 @@ import org.gradle.model.internal.type.ModelType;
 
 import java.util.Set;
 
+import static org.gradle.model.internal.manage.schema.extract.ModelSchemaUtils.weakMethodOrder;
+
 public class NewStructSchema<T> extends AbstractModelSchema<T> {
     private final Set<NewModelProperty<?>> properties;
     private final Set<WeaklyTypeReferencingMethod<?, ?>> nonPropertyMethods;
@@ -34,7 +36,7 @@ public class NewStructSchema<T> extends AbstractModelSchema<T> {
     public NewStructSchema(ModelType<T> type, Iterable<NewModelProperty<?>> properties, Iterable<WeaklyTypeReferencingMethod<?, ?>> nonPropertyMethods, Iterable<? extends ModelSchemaAspect> aspects, boolean annotated) {
         super(type);
         this.properties = ImmutableSortedSet.copyOf(properties);
-        this.nonPropertyMethods = ImmutableSortedSet.copyOf(nonPropertyMethods);
+        this.nonPropertyMethods = ImmutableSortedSet.copyOf(weakMethodOrder(), nonPropertyMethods);
         this.aspects = ImmutableSet.copyOf(aspects);
         this.annotated = annotated;
     }
@@ -48,7 +50,7 @@ public class NewStructSchema<T> extends AbstractModelSchema<T> {
     }
 
     public Set<WeaklyTypeReferencingMethod<?, ?>> getAllMethods() {
-        ImmutableSortedSet.Builder<WeaklyTypeReferencingMethod<?, ?>> builder = ImmutableSortedSet.naturalOrder();
+        ImmutableSortedSet.Builder<WeaklyTypeReferencingMethod<?, ?>> builder = ImmutableSortedSet.orderedBy(weakMethodOrder());
         for (NewModelProperty<?> property : properties) {
             builder.addAll(property.getAccessorMethods());
         }

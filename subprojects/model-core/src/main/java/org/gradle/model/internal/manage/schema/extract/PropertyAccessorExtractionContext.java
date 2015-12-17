@@ -21,6 +21,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import org.gradle.internal.Cast;
 import org.gradle.model.internal.asm.AsmClassGeneratorUtils;
+import org.gradle.model.internal.type.ModelType;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
@@ -32,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 
 public class PropertyAccessorExtractionContext {
+    private final PropertyAccessorRole role;
     private final Collection<Method> declaringMethods;
     private final Method mostSpecificDeclaration;
     private final String mostSpecificSignature;
@@ -39,7 +41,8 @@ public class PropertyAccessorExtractionContext {
     private final boolean declaredAsAbstract;
     private final Map<Class<? extends Annotation>, Annotation> annotations;
 
-    public PropertyAccessorExtractionContext(Iterable<Method> declaringMethods) {
+    public PropertyAccessorExtractionContext(PropertyAccessorRole role, Iterable<Method> declaringMethods) {
+        this.role = role;
         Method mostSpecificDeclaration = ModelSchemaUtils.findMostSpecificMethod(declaringMethods);
         this.declaringMethods = ImmutableList.copyOf(declaringMethods);
         this.mostSpecificDeclaration = mostSpecificDeclaration;
@@ -60,6 +63,14 @@ public class PropertyAccessorExtractionContext {
             }
         }
         return Collections.unmodifiableMap(annotations);
+    }
+
+    public PropertyAccessorRole getRole() {
+        return role;
+    }
+
+    public ModelType<?> getType() {
+        return role.propertyTypeFor(getMostSpecificDeclaration());
     }
 
     public Collection<Method> getDeclaringMethods() {

@@ -134,8 +134,6 @@ class StructSchemaExtractionStrategyTest extends Specification {
         extracted.properties*.readable as List == [true, true, true, true, true, true,  true]
         extracted.properties*.writable as List == [true, true, false, true, true, false, true]
         extracted.nonPropertyMethods*.name as List == [
-            "getIsAndGetReadOnly",
-            "getIsAndGetReadWrite",
             "getMixedType",
             "isInvalidIsGetter",
             "isInvalidMixedType",

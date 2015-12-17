@@ -17,14 +17,19 @@
 package org.gradle.model.internal.manage.schema;
 
 import com.google.common.base.Objects;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Maps;
 import net.jcip.annotations.ThreadSafe;
-import org.gradle.api.Nullable;
 import org.gradle.internal.Cast;
+import org.gradle.model.internal.manage.schema.extract.PropertyAccessorRole;
 import org.gradle.model.internal.method.WeaklyTypeReferencingMethod;
 import org.gradle.model.internal.type.ModelType;
 
+import java.util.Map;
 import java.util.Set;
+
+import static org.gradle.model.internal.manage.schema.extract.PropertyAccessorRole.*;
 
 @ThreadSafe
 public class NewModelProperty<T> implements Comparable<NewModelProperty<?>> {
@@ -32,19 +37,17 @@ public class NewModelProperty<T> implements Comparable<NewModelProperty<?>> {
     private final String name;
     private final ModelType<T> type;
     private final Set<ModelType<?>> declaredBy;
-    private final WeaklyTypeReferencingMethod<?, T> getter;
-    private final WeaklyTypeReferencingMethod<?, Void> setter;
+    private final ImmutableMap<PropertyAccessorRole, WeaklyTypeReferencingMethod<?, ?>> accessors;
     private final boolean declaredAsHavingUnmanagedType;
     private ModelSchema<T> schema;
 
     public NewModelProperty(ModelType<T> type, String name, Set<ModelType<?>> declaredBy,
-                            @Nullable WeaklyTypeReferencingMethod<?, T> getter, @Nullable WeaklyTypeReferencingMethod<?, Void> setter,
+                            Map<PropertyAccessorRole, WeaklyTypeReferencingMethod<?, ?>> accessors,
                             boolean declaredAsHavingUnmanagedType) {
         this.name = name;
         this.type = type;
         this.declaredBy = ImmutableSet.copyOf(declaredBy);
-        this.getter = getter;
-        this.setter = setter;
+        this.accessors = Maps.immutableEnumMap(accessors);
         this.declaredAsHavingUnmanagedType = declaredAsHavingUnmanagedType;
     }
 
@@ -65,26 +68,26 @@ public class NewModelProperty<T> implements Comparable<NewModelProperty<?>> {
     }
 
     public boolean isReadable() {
-        return getter != null;
+        return accessors.containsKey(IS_GETTER) || accessors.containsKey(GET_GETTER);
     }
 
     public boolean isWritable() {
-        return setter != null;
+        return accessors.containsKey(SETTER);
     }
 
     public Set<ModelType<?>> getDeclaredBy() {
         return declaredBy;
     }
 
-    public WeaklyTypeReferencingMethod<?, T> getGetter() {
-        return getter;
-    }
-
-    public WeaklyTypeReferencingMethod<?, Void> getSetter() {
-        return setter;
+    public WeaklyTypeReferencingMethod<?, ?> getAccessor(PropertyAccessorRole role) {
+        return accessors.get(role);
     }
 
     public <I> T getPropertyValue(I instance) {
+        WeaklyTypeReferencingMethod<?, ?> getter = accessors.get(GET_GETTER);
+        if (getter == null) {
+            getter = accessors.get(IS_GETTER);
+        }
         if (getter == null) {
             throw new IllegalStateException(String.format("Property %s is read only", this));
         }
@@ -92,14 +95,7 @@ public class NewModelProperty<T> implements Comparable<NewModelProperty<?>> {
     }
 
     public Iterable<WeaklyTypeReferencingMethod<?, ?>> getAccessorMethods() {
-        ImmutableSet.Builder<WeaklyTypeReferencingMethod<?, ?>> builder = ImmutableSet.builder();
-        if (getter != null) {
-            builder.add(Cast.<WeaklyTypeReferencingMethod<?, ?>>uncheckedCast(getter));
-        }
-        if (setter != null) {
-            builder.add(Cast.<WeaklyTypeReferencingMethod<?, ?>>uncheckedCast(setter));
-        }
-        return builder.build();
+        return accessors.values();
     }
 
     public boolean isDeclaredAsHavingUnmanagedType() {

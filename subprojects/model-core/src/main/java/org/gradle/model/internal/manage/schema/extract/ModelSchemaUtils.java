@@ -17,6 +17,7 @@
 package org.gradle.model.internal.manage.schema.extract;
 
 import com.google.common.base.Equivalence;
+import com.google.common.base.Equivalence.Wrapper;
 import com.google.common.base.Function;
 import com.google.common.collect.*;
 import groovy.lang.GroovyObject;
@@ -24,6 +25,8 @@ import org.gradle.api.Nullable;
 import org.gradle.internal.Cast;
 import org.gradle.internal.reflect.MethodSignatureEquivalence;
 import org.gradle.model.Managed;
+import org.gradle.model.internal.method.WeaklyTypeReferencingMethod;
+import org.gradle.model.internal.type.ModelType;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -33,13 +36,13 @@ import java.util.*;
 public class ModelSchemaUtils {
     private static final Equivalence<Method> METHOD_EQUIVALENCE = new MethodSignatureEquivalence();
 
-    private static final Set<Equivalence.Wrapper<Method>> IGNORED_METHODS = ImmutableSet.copyOf(
+    private static final Set<Wrapper<Method>> IGNORED_METHODS = ImmutableSet.copyOf(
         Iterables.transform(
             Iterables.concat(
                 Arrays.asList(Object.class.getMethods()),
                 Arrays.asList(GroovyObject.class.getMethods())
-            ), new Function<Method, Equivalence.Wrapper<Method>>() {
-                public Equivalence.Wrapper<Method> apply(@Nullable Method input) {
+            ), new Function<Method, Wrapper<Method>>() {
+                public Wrapper<Method> apply(@Nullable Method input) {
                     return METHOD_EQUIVALENCE.wrap(input);
                 }
             }
@@ -79,18 +82,44 @@ public class ModelSchemaUtils {
             }
         });
         ImmutableListMultimap<String, Method> methodsByName = methodsByNameBuilder.build();
-        ImmutableSortedMap.Builder<String, Map<Equivalence.Wrapper<Method>, Collection<Method>>> candidatesBuilder = ImmutableSortedMap.naturalOrder();
+        ImmutableSortedMap.Builder<String, Map<Wrapper<Method>, Collection<Method>>> candidatesBuilder = ImmutableSortedMap.naturalOrder();
         for (String methodName : methodsByName.keySet()) {
             ImmutableList<Method> methodsWithSameName = methodsByName.get(methodName);
-            ListMultimap<Equivalence.Wrapper<Method>, Method> equivalenceIndex = Multimaps.index(methodsWithSameName, new Function<Method, Equivalence.Wrapper<Method>>() {
+            ListMultimap<Wrapper<Method>, Method> equivalenceIndex = Multimaps.index(methodsWithSameName, new Function<Method, Wrapper<Method>>() {
                 @Override
-                public Equivalence.Wrapper<Method> apply(Method method) {
+                public Wrapper<Method> apply(Method method) {
                     return METHOD_EQUIVALENCE.wrap(method);
                 }
             });
             candidatesBuilder.put(methodName, equivalenceIndex.asMap());
         }
         return new CandidateMethods(candidatesBuilder.build());
+    }
+
+    public static <T> Multimap<Wrapper<Method>, Method> getAllMethods(ModelType<T> type) {
+        Class<T> clazz = type.getConcreteClass();
+        final ImmutableListMultimap.Builder<Wrapper<Method>, Method> builder = ImmutableListMultimap.builder();
+        builder.orderKeysBy(METHOD_EQUIVALENCE_ORDER);
+        ModelSchemaUtils.walkTypeHierarchy(clazz, new ModelSchemaUtils.TypeVisitor<T>() {
+            @Override
+            public void visitType(Class<? super T> type) {
+                Method[] declaredMethods = type.getDeclaredMethods();
+                // Sort of determinism
+                Arrays.sort(declaredMethods, Ordering.usingToString());
+                for (Method method : declaredMethods) {
+                    // TODO:LPTR Allow toString() to pass here
+                    if (ModelSchemaUtils.isIgnoredMethod(method)) {
+                        continue;
+                    }
+                    builder.put(METHOD_EQUIVALENCE.wrap(method), method);
+                }
+            }
+        });
+        return builder.build();
+    }
+
+    public static Ordering<WeaklyTypeReferencingMethod<?, ?>> weakMethodOrder() {
+        return WEAK_METHOD_ORDER;
     }
 
     public static boolean isIgnoredMethod(Method method) {
@@ -179,5 +208,48 @@ public class ModelSchemaUtils {
      */
     public static boolean isMethodDeclaredInManagedType(Method method) {
         return method.getDeclaringClass().isAnnotationPresent(Managed.class);
+    }
+
+    private static Ordering<Wrapper<Method>> METHOD_EQUIVALENCE_ORDER = new Ordering<Wrapper<Method>>() {
+        @Override
+        public int compare(Wrapper<Method> left, Wrapper<Method> right) {
+            return compareMethods(left.get(), right.get());
+        }
+    };
+
+    private static Ordering<WeaklyTypeReferencingMethod<?, ?>> WEAK_METHOD_ORDER = new Ordering<WeaklyTypeReferencingMethod<?, ?>>() {
+        @Override
+        public int compare(WeaklyTypeReferencingMethod<?, ?> left, WeaklyTypeReferencingMethod<?, ?> right) {
+            return compareMethods(left.getMethod(), right.getMethod());
+        }
+    };
+
+    private static int compareMethods(Method m1, Method m2) {
+        return ComparisonChain.start()
+            .compare(m1.getName(), m2.getName())
+            .compare(m1.getReturnType().getName(), m2.getReturnType().getName())
+            .compare(m1.getParameterTypes(), m2.getParameterTypes(), new Comparator<Class<?>[]>() {
+                @Override
+                public int compare(Class<?>[] o1, Class<?>[] o2) {
+                    int result = 0;
+                    UnmodifiableIterator<Class<?>> i1 = Iterators.forArray(o1);
+                    UnmodifiableIterator<Class<?>> i2 = Iterators.forArray(o2);
+                    while (i1.hasNext() && i2.hasNext()) {
+                        result = i1.next().getName().compareTo(i2.next().getName());
+                        if (result != 0) {
+                            break;
+                        }
+                    }
+                    if (result == 0) {
+                        if (i1.hasNext()) {
+                            result = 1;
+                        } else {
+                            result = -1;
+                        }
+                    }
+                    return result;
+                }
+            })
+            .result();
     }
 }

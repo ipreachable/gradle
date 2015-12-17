@@ -26,7 +26,12 @@ import org.gradle.model.internal.method.WeaklyTypeReferencingMethod;
 import org.gradle.model.internal.type.ModelType;
 
 import java.lang.reflect.Method;
-import java.util.*;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+
+import static org.gradle.model.internal.manage.schema.extract.PropertyAccessorRole.GET_GETTER;
+import static org.gradle.model.internal.manage.schema.extract.PropertyAccessorRole.IS_GETTER;
 
 public abstract class StructSchemaExtractionStrategySupport implements ModelSchemaExtractionStrategy {
 
@@ -71,24 +76,18 @@ public abstract class StructSchemaExtractionStrategySupport implements ModelSche
         Map<String, ModelPropertyExtractionContext> propertiesMap = Maps.newTreeMap();
         for (Map.Entry<Equivalence.Wrapper<Method>, Collection<Method>> entry : candidateMethods.allMethods().entrySet()) {
             Method method = entry.getKey().get();
-            MethodType methodType = MethodType.of(method);
+            PropertyAccessorRole role = PropertyAccessorRole.of(method);
             Collection<Method> methodsWithEqualSignature = entry.getValue();
-            if (MethodType.NON_PROPERTY == methodType) {
+            if (role == null) {
                 handleNonPropertyMethod(context, methodsWithEqualSignature);
             } else {
-                String propertyName = methodType.propertyNameFor(method);
+                String propertyName = role.propertyNameFor(method);
                 ModelPropertyExtractionContext propertyContext = propertiesMap.get(propertyName);
                 if (propertyContext == null) {
                     propertyContext = new ModelPropertyExtractionContext(propertyName);
                     propertiesMap.put(propertyName, propertyContext);
                 }
-                if (MethodType.GET_GETTER == methodType) {
-                    propertyContext.setGetGetter(new PropertyAccessorExtractionContext(methodsWithEqualSignature));
-                } else if (MethodType.IS_GETTER == methodType) {
-                    propertyContext.setIsGetter(new PropertyAccessorExtractionContext(methodsWithEqualSignature));
-                } else {
-                    propertyContext.setSetter(new PropertyAccessorExtractionContext(methodsWithEqualSignature));
-                }
+                propertyContext.addAccessor(new PropertyAccessorExtractionContext(role, methodsWithEqualSignature));
             }
         }
         return Collections2.filter(propertiesMap.values(), new Predicate<ModelPropertyExtractionContext>() {
@@ -105,8 +104,8 @@ public abstract class StructSchemaExtractionStrategySupport implements ModelSche
 
     private void validateProperties(ModelSchemaExtractionContext<?> context, Iterable<ModelPropertyExtractionContext> properties) {
         for (ModelPropertyExtractionContext property : properties) {
-            PropertyAccessorExtractionContext getGetter = property.getGetGetter();
-            PropertyAccessorExtractionContext isGetter = property.getIsGetter();
+            PropertyAccessorExtractionContext getGetter = property.getAccessor(GET_GETTER);
+            PropertyAccessorExtractionContext isGetter = property.getAccessor(IS_GETTER);
             if (getGetter != null && isGetter != null) {
                 Method getMethod = getGetter.getMostSpecificDeclaration();
                 Method isMethod = isGetter.getMostSpecificDeclaration();
@@ -143,7 +142,7 @@ public abstract class StructSchemaExtractionStrategySupport implements ModelSche
         final ModelType<R> returnType = ModelType.returnType(gettersContext.getMostSpecificDeclaration());
 
         WeaklyTypeReferencingMethod<?, Void> setterRef;
-        PropertyAccessorExtractionContext setterContext = property.getSetter();
+        PropertyAccessorExtractionContext setterContext = property.getAccessor(PropertyAccessorRole.SETTER);
         if (setterContext != null) {
             Method mostSpecificDeclaration = setterContext.getMostSpecificDeclaration();
             setterRef = WeaklyTypeReferencingMethod.of(ModelType.of(mostSpecificDeclaration.getDeclaringClass()), ModelType.of(void.class), mostSpecificDeclaration);

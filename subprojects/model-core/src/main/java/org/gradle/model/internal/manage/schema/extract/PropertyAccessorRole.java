@@ -17,23 +17,49 @@
 package org.gradle.model.internal.manage.schema.extract;
 
 import org.apache.commons.lang.StringUtils;
+import org.gradle.model.internal.type.ModelType;
 
 import java.lang.reflect.Method;
 
 /**
- * Distinguish get getters, is getters and setters from non-property methods.
+ * Distinguishes "get" getters, "is" getters and setters from non-property methods.
  */
-public enum MethodType {
-    IS_GETTER, GET_GETTER, SETTER, NON_PROPERTY;
+public enum PropertyAccessorRole {
+    IS_GETTER(2) {
+        @Override
+        public ModelType<?> propertyTypeFor(Method method) {
+            return ModelType.returnType(method);
+        }
+    },
+
+    GET_GETTER(3) {
+        @Override
+        public ModelType<?> propertyTypeFor(Method method) {
+            return ModelType.returnType(method);
+        }
+    },
+
+    SETTER(3) {
+        @Override
+        public ModelType<?> propertyTypeFor(Method method) {
+            return ModelType.paramType(method, 0);
+        }
+    };
+
+    private final int prefixLength;
+
+    PropertyAccessorRole(int prefixLength) {
+        this.prefixLength = prefixLength;
+    }
 
     public String propertyNameFor(Method method) {
-        String methodName = method.getName();
-        int prefixLength = this == MethodType.IS_GETTER ? 2 : 3;
-        String methodNamePrefixRemoved = methodName.substring(prefixLength);
+        String methodNamePrefixRemoved = method.getName().substring(prefixLength);
         return StringUtils.uncapitalize(methodNamePrefixRemoved);
     }
 
-    public static MethodType of(Method method) {
+    abstract public ModelType<?> propertyTypeFor(Method method);
+
+    public static PropertyAccessorRole of(Method method) {
         String methodName = method.getName();
         if (!hasVoidReturnType(method) && takesNoParameter(method)) {
             if (isGetGetterName(methodName)) {
@@ -46,7 +72,11 @@ public enum MethodType {
         if (hasVoidReturnType(method) && takesSingleParameter(method) && isSetterName(methodName)) {
             return SETTER;
         }
-        return NON_PROPERTY;
+        return null;
+    }
+
+    public static boolean isPropertyMethodName(String methodName) {
+        return isGetGetterName(methodName) || isIsGetterName(methodName) || isSetterName(methodName);
     }
 
     public static boolean hasVoidReturnType(Method method) {
@@ -61,19 +91,15 @@ public enum MethodType {
         return method.getParameterTypes().length == 1;
     }
 
-    public static boolean isPropertyMethodName(String methodName) {
-        return isGetGetterName(methodName) || isIsGetterName(methodName) || isSetterName(methodName);
-    }
-
     public static boolean isGetterName(String methodName) {
         return isGetGetterName(methodName) || isIsGetterName(methodName);
     }
 
-    public static boolean isGetGetterName(String methodName) {
+    private static boolean isGetGetterName(String methodName) {
         return methodName.startsWith("get") && !"get".equals(methodName) && isNthCharUpperCase(methodName, 4);
     }
 
-    public static boolean isIsGetterName(String methodName) {
+    private static boolean isIsGetterName(String methodName) {
         return methodName.startsWith("is") && !"is".equals(methodName) && isNthCharUpperCase(methodName, 3);
     }
 

@@ -29,6 +29,9 @@ import org.gradle.model.internal.type.ModelType;
 import java.lang.reflect.Method;
 import java.util.Collection;
 
+import static org.gradle.model.internal.manage.schema.extract.PropertyAccessorRole.GET_GETTER;
+import static org.gradle.model.internal.manage.schema.extract.PropertyAccessorRole.IS_GETTER;
+
 public class UnmanagedImplStructStrategy extends StructSchemaExtractionStrategySupport {
 
     public UnmanagedImplStructStrategy(ModelSchemaAspectExtractor aspectExtractor) {
@@ -55,7 +58,7 @@ public class UnmanagedImplStructStrategy extends StructSchemaExtractionStrategyS
 
     @Override
     protected boolean selectProperty(ModelSchemaExtractionContext<?> context, ModelPropertyExtractionContext property) {
-        return !(property.getGetGetter() == null && property.getIsGetter() == null);
+        return !(property.getAccessor(GET_GETTER) == null && property.getAccessor(IS_GETTER) == null);
     }
 
     @Override

@@ -16,11 +16,13 @@
 
 package org.gradle.model.internal.manage.schema.extract;
 
-import com.google.common.base.*;
+import com.google.common.base.Equivalence;
 import com.google.common.base.Equivalence.Wrapper;
+import com.google.common.base.Function;
+import com.google.common.base.Functions;
+import com.google.common.base.Joiner;
 import com.google.common.collect.*;
 import org.gradle.api.Action;
-import org.gradle.internal.reflect.MethodSignatureEquivalence;
 import org.gradle.model.Unmanaged;
 import org.gradle.model.internal.manage.schema.ModelSchema;
 import org.gradle.model.internal.manage.schema.NewModelProperty;
@@ -29,11 +31,14 @@ import org.gradle.model.internal.method.WeaklyTypeReferencingMethod;
 import org.gradle.model.internal.type.ModelType;
 
 import java.lang.reflect.Method;
-import java.util.*;
+import java.util.Collection;
+import java.util.Map;
+import java.util.Set;
+
+import static org.gradle.model.internal.manage.schema.extract.ModelSchemaUtils.getAllMethods;
+import static org.gradle.model.internal.manage.schema.extract.PropertyAccessorRole.*;
 
 public class NewStructSchemaExtractionStrategy implements ModelSchemaExtractionStrategy {
-    private static final Equivalence<Method> METHOD_EQUIVALENCE = new MethodSignatureEquivalence();
-
     private final ModelSchemaAspectExtractor aspectExtractor;
 
     public NewStructSchemaExtractionStrategy(ModelSchemaAspectExtractor aspectExtractor) {
@@ -74,167 +79,103 @@ public class NewStructSchemaExtractionStrategy implements ModelSchemaExtractionS
         Map<String, ModelPropertyExtractionContext> propertiesMap = Maps.newTreeMap();
         for (Map.Entry<Equivalence.Wrapper<Method>, Collection<Method>> entry : allMethods.asMap().entrySet()) {
             Method method = entry.getKey().get();
-            MethodType methodType = MethodType.of(method);
-            Collection<Method> methodsWithEqualSignature = entry.getValue();
-            switch (methodType) {
-                case NON_PROPERTY:
-                    nonPropertyMethods.add(method);
-                    continue;
-                case GET_GETTER:
-                    getPropertyContext(propertiesMap, methodType.propertyNameFor(method)).setGetGetter(new PropertyAccessorExtractionContext(methodsWithEqualSignature));
-                    break;
-                case IS_GETTER:
-                    getPropertyContext(propertiesMap, methodType.propertyNameFor(method)).setIsGetter(new PropertyAccessorExtractionContext(methodsWithEqualSignature));
-                    break;
-                case SETTER:
-                    getPropertyContext(propertiesMap, methodType.propertyNameFor(method)).setSetter(new PropertyAccessorExtractionContext(methodsWithEqualSignature));
-                    break;
-                default:
-                    throw new AssertionError();
+            PropertyAccessorRole role = PropertyAccessorRole.of(method);
+            if (role == null) {
+                nonPropertyMethods.add(method);
+                continue;
             }
+            String propertyName = role.propertyNameFor(method);
+            ModelPropertyExtractionContext propertyContext = propertiesMap.get(propertyName);
+            if (propertyContext == null) {
+                propertyContext = new ModelPropertyExtractionContext(propertyName);
+                propertiesMap.put(propertyName, propertyContext);
+            }
+            Collection<Method> methodsWithEqualSignature = entry.getValue();
+            propertyContext.addAccessor(new PropertyAccessorExtractionContext(role, methodsWithEqualSignature));
         }
         return propertiesMap.values();
     }
 
-    private ModelPropertyExtractionContext getPropertyContext(Map<String, ModelPropertyExtractionContext> propertiesMap, String propertyName) {
-        ModelPropertyExtractionContext propertyContext = propertiesMap.get(propertyName);
-        if (propertyContext == null) {
-            propertyContext = new ModelPropertyExtractionContext(propertyName);
-            propertiesMap.put(propertyName, propertyContext);
-        }
-        return propertyContext;
-    }
-
     private void filterInvalidProperties(Iterable<ModelPropertyExtractionContext> propertyContexts, ImmutableCollection.Builder<NewModelPropertyExtractionResult<?>> validProperties, ImmutableCollection.Builder<Method> nonPropertyMethods) {
         for (ModelPropertyExtractionContext propertyContext : propertyContexts) {
-            PropertyAccessorExtractionContext getGetter = propertyContext.getGetGetter();
-            PropertyAccessorExtractionContext isGetter = propertyContext.getIsGetter();
-            PropertyAccessorExtractionContext setter = propertyContext.getSetter();
+            PropertyAccessorExtractionContext getGetter = propertyContext.getAccessor(GET_GETTER);
+            PropertyAccessorExtractionContext isGetter = propertyContext.getAccessor(IS_GETTER);
+            PropertyAccessorExtractionContext setter = propertyContext.getAccessor(SETTER);
 
             // TODO:LPTR Validate setter
 
-            PropertyAccessorExtractionContext chosenGetter;
-            boolean declaredAsUnmanaged;
-            ImmutableSet.Builder<ModelType<?>> declaredByBuilder = ImmutableSet.builder();
+            ModelType<?> propertyType;
+            if (isGetter != null) {
+                if (!isGetter.getType().equals(ModelType.BOOLEAN)) {
+                    propertyContext.dropInvalidAccessor(IS_GETTER, nonPropertyMethods);
+                }
+            }
 
             if (isGetter != null) {
-                Method mostSpecificIsGetter = isGetter.getMostSpecificDeclaration();
-                Class<?> isReturnType = mostSpecificIsGetter.getReturnType();
-                if (isReturnType != Boolean.TYPE) {
-                    chosenGetter = getGetter;
-                    nonPropertyMethods.add(mostSpecificIsGetter);
-                    declaredAsUnmanaged = isDeclaredAsUnmanaged(getGetter);
-                    addDeclaredBy(getGetter, declaredByBuilder);
-                } else if (getGetter != null) {
-                    Method mostSpecificGetGetter = getGetter.getMostSpecificDeclaration();
-                    Class<?> getReturnType = mostSpecificGetGetter.getReturnType();
-                    if (getReturnType != Boolean.TYPE) {
-                        if (setter != null && setter.getMostSpecificDeclaration().getParameterTypes()[0] == Boolean.TYPE) {
-                            chosenGetter = isGetter;
-                            nonPropertyMethods.add(mostSpecificGetGetter);
-                            declaredAsUnmanaged = isDeclaredAsUnmanaged(isGetter);
-                            addDeclaredBy(isGetter, declaredByBuilder);
+                if (getGetter != null) {
+                    if (!getGetter.getType().equals(ModelType.BOOLEAN)) {
+                        if (setter != null) {
+                            if (setter.getType().equals(getGetter.getType())) {
+                                propertyType = setter.getType();
+                                propertyContext.dropInvalidAccessor(IS_GETTER, nonPropertyMethods);
+                            } else if (setter.getType().equals(ModelType.BOOLEAN)) {
+                                propertyType = ModelType.BOOLEAN;
+                                propertyContext.dropInvalidAccessor(GET_GETTER, nonPropertyMethods);
+                            } else {
+                                propertyType = ModelType.BOOLEAN;
+                                propertyContext.dropInvalidAccessor(GET_GETTER, nonPropertyMethods);
+                                propertyContext.dropInvalidAccessor(SETTER, nonPropertyMethods);
+                            }
                         } else {
-                            chosenGetter = getGetter;
-                            nonPropertyMethods.add(mostSpecificIsGetter);
-                            declaredAsUnmanaged = isDeclaredAsUnmanaged(getGetter);
-                            addDeclaredBy(getGetter, declaredByBuilder);
+                            propertyType = ModelType.BOOLEAN;
+                            propertyContext.dropInvalidAccessor(GET_GETTER, nonPropertyMethods);
                         }
                     } else {
-                        chosenGetter = isGetter;
-                        nonPropertyMethods.add(mostSpecificGetGetter);
-                        declaredAsUnmanaged = isDeclaredAsUnmanaged(isGetter) || isDeclaredAsUnmanaged(getGetter);
-                        addDeclaredBy(getGetter, declaredByBuilder);
-                        addDeclaredBy(isGetter, declaredByBuilder);
+                        propertyType = ModelType.BOOLEAN;
+                        if (setter != null && !setter.getType().equals(ModelType.BOOLEAN)) {
+                            propertyContext.dropInvalidAccessor(SETTER, nonPropertyMethods);
+                        }
                     }
                 } else {
-                    chosenGetter = isGetter;
-                    declaredAsUnmanaged = isDeclaredAsUnmanaged(isGetter);
-                    addDeclaredBy(isGetter, declaredByBuilder);
-                }
-            } else {
-                chosenGetter = getGetter;
-                declaredAsUnmanaged = isDeclaredAsUnmanaged(getGetter);
-                addDeclaredBy(getGetter, declaredByBuilder);
-            }
-
-            ModelType<?> propertyType;
-            if (chosenGetter != null) {
-                Method mostSpecificGetter = chosenGetter.getMostSpecificDeclaration();
-                ModelType<?> getterType = ModelType.returnType(mostSpecificGetter);
-                if (setter != null) {
-                    Method mostSpecificSetter = setter.getMostSpecificDeclaration();
-                    ModelType<?> setterType = ModelType.paramType(mostSpecificSetter, 0);
-                    if (!getterType.equals(setterType)) {
-                        nonPropertyMethods.add(mostSpecificSetter);
-                        setter = null;
+                    propertyType = ModelType.BOOLEAN;
+                    if (setter != null && !setter.getType().equals(ModelType.BOOLEAN)) {
+                        propertyContext.dropInvalidAccessor(SETTER, nonPropertyMethods);
                     }
                 }
-                propertyType = getterType;
+            } else if (getGetter != null) {
+                propertyType = getGetter.getType();
+                if (setter != null && !setter.getType().equals(propertyType)) {
+                    propertyContext.dropInvalidAccessor(SETTER, nonPropertyMethods);
+                }
             } else {
-                // If we don't have a getter, we must have a setter, otherwise there's nothing to declare this property
                 assert setter != null;
-                propertyType = ModelType.paramType(setter.getMostSpecificDeclaration(), 0);
+                propertyType = setter.getType();
             }
 
-            addDeclaredBy(setter, declaredByBuilder);
-
-            Iterable<PropertyAccessorExtractionContext> allGetters = Iterables.filter(Arrays.asList(isGetter, getGetter), Predicates.<PropertyAccessorExtractionContext>notNull());
-            NewModelPropertyExtractionResult<?> propertyResult = createProperty(propertyType, propertyContext.getPropertyName(), allGetters, chosenGetter, setter, declaredByBuilder.build(), declaredAsUnmanaged);
+            NewModelPropertyExtractionResult<?> propertyResult = createProperty(propertyType, propertyContext);
             validProperties.add(propertyResult);
         }
     }
 
-    private static <P> NewModelPropertyExtractionResult<P> createProperty(ModelType<P> propertyType, String propertyName, Iterable<PropertyAccessorExtractionContext> allGetters, PropertyAccessorExtractionContext getter, PropertyAccessorExtractionContext setter, Set<ModelType<?>> declaredBy, boolean declaredAsUnmanaged) {
-        WeaklyTypeReferencingMethod<?, P> getterRef;
-        if (getter == null) {
-            getterRef = null;
-        } else {
-            Method getterMethod = getter.getMostSpecificDeclaration();
-            getterRef = WeaklyTypeReferencingMethod.of(ModelType.declaringType(getterMethod), propertyType, getterMethod);
+    private static <P> NewModelPropertyExtractionResult<P> createProperty(ModelType<P> propertyType, ModelPropertyExtractionContext propertyContext) {
+        ImmutableMap.Builder<PropertyAccessorRole, WeaklyTypeReferencingMethod<?, ?>> accessors = ImmutableMap.builder();
+        for (PropertyAccessorExtractionContext accessor : propertyContext.getAccessors()) {
+            Method method = accessor.getMostSpecificDeclaration();
+            WeaklyTypeReferencingMethod<Object, Object> methodRef = WeaklyTypeReferencingMethod.of(ModelType.declaringType(method), ModelType.returnType(method), method);
+            accessors.put(accessor.getRole(), methodRef);
         }
-        WeaklyTypeReferencingMethod<?, Void> setterRef;
-        if (setter == null) {
-            setterRef = null;
-        } else {
-            Method setterMethod = setter.getMostSpecificDeclaration();
-            setterRef = WeaklyTypeReferencingMethod.of(ModelType.declaringType(setterMethod), ModelType.VOID, setterMethod);
-        }
-        NewModelProperty<P> property = new NewModelProperty<P>(propertyType, propertyName, declaredBy, getterRef, setterRef, declaredAsUnmanaged);
-        return new NewModelPropertyExtractionResult<P>(property, allGetters, setter);
-    }
-
-    private static void addDeclaredBy(PropertyAccessorExtractionContext accessor, ImmutableCollection.Builder<ModelType<?>> declaredBy) {
-        if (accessor != null) {
-            for (Method declaration : accessor.getDeclaringMethods()) {
-                declaredBy.add(ModelType.of(declaration.getDeclaringClass()));
-            }
-        }
+        NewModelProperty<P> property = new NewModelProperty<P>(
+            propertyType,
+            propertyContext.getPropertyName(),
+            propertyContext.getDeclaredBy(),
+            accessors.build(),
+            propertyContext.isDeclaredAsUnmanaged()
+        );
+        return new NewModelPropertyExtractionResult<P>(property, propertyContext.getAccessors());
     }
 
     private static boolean isDeclaredAsUnmanaged(PropertyAccessorExtractionContext getter) {
         return getter != null && getter.getMostSpecificDeclaration().isAnnotationPresent(Unmanaged.class);
-    }
-
-    private static <T> Multimap<Wrapper<Method>, Method> getAllMethods(ModelType<T> type) {
-        Class<T> clazz = type.getConcreteClass();
-        final ImmutableListMultimap.Builder<Wrapper<Method>, Method> builder = ImmutableListMultimap.builder();
-        ModelSchemaUtils.walkTypeHierarchy(clazz, new ModelSchemaUtils.TypeVisitor<T>() {
-            @Override
-            public void visitType(Class<? super T> type) {
-                Method[] declaredMethods = type.getDeclaredMethods();
-                // Sort of determinism
-                Arrays.sort(declaredMethods, Ordering.usingToString());
-                for (Method method : declaredMethods) {
-                    // TODO:LPTR Allow toString() to pass here
-                    if (ModelSchemaUtils.isIgnoredMethod(method)) {
-                        continue;
-                    }
-                    builder.put(METHOD_EQUIVALENCE.wrap(method), method);
-                }
-            }
-        });
-        return builder.build();
     }
 
     private <T, P> void attachPropertyExtractionContext(ModelSchemaExtractionContext<T> extractionContext, final NewModelProperty<P> property) {

@@ -57,8 +57,12 @@ public class VariantAspectExtractionStrategy implements ModelSchemaAspectExtract
         ImmutableSet.Builder<NewModelProperty<?>> dimensionsBuilder = ImmutableSet.builder();
         for (NewModelPropertyExtractionResult<?> propertyResult : propertyResults) {
             NewModelProperty<?> property = propertyResult.getProperty();
-            for (PropertyAccessorExtractionContext getter : propertyResult.getGetters()) {
-                if (getter.isAnnotationPresent(Variant.class)) {
+            for (PropertyAccessorExtractionContext accessor : propertyResult.getAccessors()) {
+                // Annotations on setters are silently ignored
+                if (accessor.getRole() == PropertyAccessorRole.SETTER) {
+                    continue;
+                }
+                if (accessor.isAnnotationPresent(Variant.class)) {
                     Class<?> propertyType = property.getType().getRawClass();
                     if (!String.class.equals(propertyType) && !Named.class.isAssignableFrom(propertyType)) {
                         // Annotations on non-String and non-Named properties are ignored
@@ -67,7 +71,6 @@ public class VariantAspectExtractionStrategy implements ModelSchemaAspectExtract
                     dimensionsBuilder.add(property);
                 }
             }
-            // Annotations on setters are silently ignored
         }
         ImmutableSet<NewModelProperty<?>> dimensions = dimensionsBuilder.build();
         if (dimensions.isEmpty()) {
