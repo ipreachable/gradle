@@ -17,6 +17,7 @@
 package org.gradle.model.internal.manage.schema.extract
 import com.google.common.base.Optional
 import groovy.transform.NotYetImplemented
+import org.gradle.api.internal.ClosureBackedAction
 import org.gradle.api.internal.file.FileResolver
 import org.gradle.internal.typeconversion.DefaultTypeConverter
 import org.gradle.model.Managed
@@ -378,7 +379,7 @@ class NewManagedProxyClassGeneratorTest extends Specification {
         }
 
         then:
-        1 * state.get("otherValue") >> prop
+        1 * state.apply("otherValue", _) >> { String propName, Closure cl -> ClosureBackedAction.execute(prop, cl)}
         1 * prop.setValue("12")
         0 * state._
     }
@@ -402,6 +403,7 @@ class NewManagedProxyClassGeneratorTest extends Specification {
         }
 
         then:
+        1 * state.apply("otherValue", _) >> { String propName, Closure cl -> ClosureBackedAction.execute(prop, cl)}
         1 * prop.setValue("12")
         0 * state._
     }

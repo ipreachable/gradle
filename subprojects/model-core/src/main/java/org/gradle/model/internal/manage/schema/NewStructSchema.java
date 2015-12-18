@@ -29,19 +29,16 @@ import java.util.Set;
 
 import static org.gradle.model.internal.manage.schema.extract.ModelSchemaUtils.weakMethodOrder;
 
-public class NewStructSchema<T> extends AbstractModelSchema<T> {
+public class NewStructSchema<T> extends AbstractModelSchema<T> implements CompositeSchema<T> {
     private final Map<String, NewModelProperty<?>> properties;
     private final Set<WeaklyTypeReferencingMethod<?, ?>> nonPropertyMethods;
     private final Set<? extends ModelSchemaAspect> aspects;
-    // TODO:LPTR Do we need this?
-    private final boolean annotated;
 
-    public NewStructSchema(ModelType<T> type, Map<String, NewModelProperty<?>> properties, Iterable<WeaklyTypeReferencingMethod<?, ?>> nonPropertyMethods, Iterable<? extends ModelSchemaAspect> aspects, boolean annotated) {
+    public NewStructSchema(ModelType<T> type, Map<String, NewModelProperty<?>> properties, Iterable<WeaklyTypeReferencingMethod<?, ?>> nonPropertyMethods, Iterable<? extends ModelSchemaAspect> aspects) {
         super(type);
         this.properties = ImmutableSortedMap.copyOf(properties);
         this.nonPropertyMethods = ImmutableSortedSet.copyOf(weakMethodOrder(), nonPropertyMethods);
         this.aspects = ImmutableSet.copyOf(aspects);
-        this.annotated = annotated;
     }
 
     public Collection<NewModelProperty<?>> getProperties() {
@@ -67,9 +64,5 @@ public class NewStructSchema<T> extends AbstractModelSchema<T> {
 
     public Set<? extends ModelSchemaAspect> getAspects() {
         return aspects;
-    }
-
-    public boolean isAnnotated() {
-        return annotated;
     }
 }

@@ -22,7 +22,6 @@ import com.google.common.collect.Iterables;
 import groovy.lang.Closure;
 import groovy.lang.MissingMethodException;
 import groovy.lang.MissingPropertyException;
-import org.gradle.api.internal.ClosureBackedAction;
 import org.gradle.internal.Cast;
 import org.gradle.internal.typeconversion.TypeConverter;
 import org.gradle.model.internal.asm.AsmClassGeneratorUtils;
@@ -470,25 +469,6 @@ public class NewManagedProxyClassGenerator extends AbstractProxyClassGenerator {
             putConstantOnStack(methodVisitor, property.getName());
             putFirstMethodArgumentOnStack(methodVisitor);
             methodVisitor.visitMethodInsn(INVOKEINTERFACE, MODEL_ELEMENT_STATE_TYPE_INTERNAL_NAME, "apply", STATE_APPLY_METHOD_DESCRIPTOR, true);
-            finishVisitingMethod(methodVisitor);
-            return;
-        }
-        if (!property.isWritable() && property.getSchema() instanceof NewStructSchema) {
-            NewStructSchema<?> structSchema = (NewStructSchema<?>) property.getSchema();
-            if (!structSchema.isAnnotated()) {
-                return;
-            }
-            WeaklyTypeReferencingMethod<?, ?> getter = property.getAccessor(GET_GETTER);
-            if (getter == null) {
-                getter = property.getAccessor(IS_GETTER);
-            }
-
-            // Adds a void $propName(Closure<?> cl) method that executes the closure
-            MethodVisitor methodVisitor = declareMethod(visitor, property.getName(), Type.getMethodDescriptor(Type.VOID_TYPE, CLOSURE_TYPE), null);
-            putThisOnStack(methodVisitor);
-            methodVisitor.visitMethodInsn(INVOKEVIRTUAL, generatedType.getInternalName(), getter.getName(), Type.getMethodDescriptor(Type.getType(property.getType().getConcreteClass())), false);
-            putFirstMethodArgumentOnStack(methodVisitor);
-            methodVisitor.visitMethodInsn(INVOKESTATIC, Type.getInternalName(ClosureBackedAction.class), "execute", Type.getMethodDescriptor(Type.VOID_TYPE, OBJECT_TYPE, CLOSURE_TYPE), false);
             finishVisitingMethod(methodVisitor);
             return;
         }
