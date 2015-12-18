@@ -23,7 +23,6 @@ import com.google.common.base.Functions;
 import com.google.common.base.Joiner;
 import com.google.common.collect.*;
 import org.gradle.api.Action;
-import org.gradle.model.Unmanaged;
 import org.gradle.model.internal.manage.schema.ModelSchema;
 import org.gradle.model.internal.manage.schema.NewModelProperty;
 import org.gradle.model.internal.manage.schema.NewStructSchema;
@@ -172,10 +171,6 @@ public class NewStructSchemaExtractionStrategy implements ModelSchemaExtractionS
             propertyContext.isDeclaredAsUnmanaged()
         );
         return new NewModelPropertyExtractionResult<P>(property, propertyContext.getAccessors());
-    }
-
-    private static boolean isDeclaredAsUnmanaged(PropertyAccessorExtractionContext getter) {
-        return getter != null && getter.getMostSpecificDeclaration().isAnnotationPresent(Unmanaged.class);
     }
 
     private <T, P> void attachPropertyExtractionContext(ModelSchemaExtractionContext<T> extractionContext, final NewModelProperty<P> property) {
