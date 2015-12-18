@@ -60,12 +60,12 @@ public class NewStructSchemaExtractionStrategy implements ModelSchemaExtractionS
         Set<NewModelPropertyExtractionResult<?>> validPropertyResults = validPropertiesBuilder.build();
         Iterable<? extends ModelSchemaAspect> aspects = aspectExtractor.extract(extractionContext, validPropertyResults);
 
-        ImmutableSet.Builder<NewModelProperty<?>> propertiesBuilder = ImmutableSet.builder();
+        ImmutableSortedMap.Builder<String, NewModelProperty<?>> propertiesBuilder = ImmutableSortedMap.naturalOrder();
         for (NewModelPropertyExtractionResult<?> propertyResult : validPropertyResults) {
-            propertiesBuilder.add(propertyResult.getProperty());
+            propertiesBuilder.put(propertyResult.getProperty().getName(), propertyResult.getProperty());
             attachPropertyExtractionContext(extractionContext, propertyResult.getProperty());
         }
-        ImmutableSet<NewModelProperty<?>> properties = propertiesBuilder.build();
+        Map<String, NewModelProperty<?>> properties = propertiesBuilder.build();
         Iterable<WeaklyTypeReferencingMethod<?, ?>> nonPropertyMethods = Iterables.transform(nonPropertyMethodsBuilder.build(), new Function<Method, WeaklyTypeReferencingMethod<?, ?>>() {
             @Override
             public WeaklyTypeReferencingMethod<?, ?> apply(Method method) {

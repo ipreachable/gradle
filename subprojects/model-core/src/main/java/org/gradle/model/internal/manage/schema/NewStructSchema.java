@@ -17,32 +17,39 @@
 package org.gradle.model.internal.manage.schema;
 
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.ImmutableSortedSet;
 import org.gradle.model.internal.manage.schema.extract.ModelSchemaAspect;
 import org.gradle.model.internal.method.WeaklyTypeReferencingMethod;
 import org.gradle.model.internal.type.ModelType;
 
+import java.util.Collection;
+import java.util.Map;
 import java.util.Set;
 
 import static org.gradle.model.internal.manage.schema.extract.ModelSchemaUtils.weakMethodOrder;
 
 public class NewStructSchema<T> extends AbstractModelSchema<T> {
-    private final Set<NewModelProperty<?>> properties;
+    private final Map<String, NewModelProperty<?>> properties;
     private final Set<WeaklyTypeReferencingMethod<?, ?>> nonPropertyMethods;
     private final Set<? extends ModelSchemaAspect> aspects;
     // TODO:LPTR Do we need this?
     private final boolean annotated;
 
-    public NewStructSchema(ModelType<T> type, Iterable<NewModelProperty<?>> properties, Iterable<WeaklyTypeReferencingMethod<?, ?>> nonPropertyMethods, Iterable<? extends ModelSchemaAspect> aspects, boolean annotated) {
+    public NewStructSchema(ModelType<T> type, Map<String, NewModelProperty<?>> properties, Iterable<WeaklyTypeReferencingMethod<?, ?>> nonPropertyMethods, Iterable<? extends ModelSchemaAspect> aspects, boolean annotated) {
         super(type);
-        this.properties = ImmutableSortedSet.copyOf(properties);
+        this.properties = ImmutableSortedMap.copyOf(properties);
         this.nonPropertyMethods = ImmutableSortedSet.copyOf(weakMethodOrder(), nonPropertyMethods);
         this.aspects = ImmutableSet.copyOf(aspects);
         this.annotated = annotated;
     }
 
-    public Set<NewModelProperty<?>> getProperties() {
-        return properties;
+    public Collection<NewModelProperty<?>> getProperties() {
+        return properties.values();
+    }
+
+    public boolean hasProperty(String name) {
+        return properties.containsKey(name);
     }
 
     public Set<WeaklyTypeReferencingMethod<?, ?>> getNonPropertyMethods() {
@@ -51,7 +58,7 @@ public class NewStructSchema<T> extends AbstractModelSchema<T> {
 
     public Set<WeaklyTypeReferencingMethod<?, ?>> getAllMethods() {
         ImmutableSortedSet.Builder<WeaklyTypeReferencingMethod<?, ?>> builder = ImmutableSortedSet.orderedBy(weakMethodOrder());
-        for (NewModelProperty<?> property : properties) {
+        for (NewModelProperty<?> property : properties.values()) {
             builder.addAll(property.getAccessorMethods());
         }
         builder.addAll(nonPropertyMethods);
