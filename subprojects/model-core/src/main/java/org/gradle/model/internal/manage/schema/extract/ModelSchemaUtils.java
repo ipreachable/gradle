@@ -243,7 +243,7 @@ public class ModelSchemaUtils {
                     if (result == 0) {
                         if (i1.hasNext()) {
                             result = 1;
-                        } else {
+                        } else if (i2.hasNext()) {
                             result = -1;
                         }
                     }
