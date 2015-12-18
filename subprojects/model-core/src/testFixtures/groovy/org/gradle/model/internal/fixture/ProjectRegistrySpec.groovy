@@ -24,18 +24,19 @@ import org.gradle.model.internal.core.ModelRegistrations
 import org.gradle.model.internal.core.NodeInitializerRegistry
 import org.gradle.model.internal.inspect.ModelRuleExtractor
 import org.gradle.model.internal.manage.instance.ManagedProxyFactory
+import org.gradle.model.internal.manage.instance.ManagedStructBindingStore
 import org.gradle.model.internal.manage.schema.ModelSchemaStore
-import org.gradle.model.internal.manage.schema.extract.DefaultModelSchemaStore
 import org.gradle.model.internal.registry.ModelRegistry
 import org.gradle.util.TestUtil
 import spock.lang.Specification
 
 @SuppressWarnings("GrMethodMayBeStatic")
 class ProjectRegistrySpec extends Specification {
-    public static final DefaultModelSchemaStore SCHEMA_STORE
+    public static final ModelSchemaStore SCHEMA_STORE
     public static final ManagedProxyFactory MANAGED_PROXY_FACTORY
     public static final ModelRuleExtractor MODEL_RULE_EXTRACTOR
-    public static final DefaultNodeInitializerRegistry NODE_INITIALIZER_REGISTRY
+    public static final NodeInitializerRegistry NODE_INITIALIZER_REGISTRY
+    public static final ManagedStructBindingStore BINDING_STORE
 
     static {
         def services = TestUtil.createRootProject().services
@@ -43,6 +44,7 @@ class ProjectRegistrySpec extends Specification {
         MANAGED_PROXY_FACTORY = services.get(ManagedProxyFactory)
         MODEL_RULE_EXTRACTOR = services.get(ModelRuleExtractor)
         NODE_INITIALIZER_REGISTRY = new DefaultNodeInitializerRegistry(SCHEMA_STORE)
+        BINDING_STORE = new ManagedStructBindingStore(SCHEMA_STORE)
     }
 
     ModelRegistry registry = createModelRegistry()
@@ -50,6 +52,7 @@ class ProjectRegistrySpec extends Specification {
     ManagedProxyFactory proxyFactory = MANAGED_PROXY_FACTORY
     ModelRuleExtractor modelRuleExtractor = MODEL_RULE_EXTRACTOR
     NodeInitializerRegistry nodeInitializerRegistry = createNodeInitializerRegistry()
+    ManagedStructBindingStore bindingStore = createBindingStore()
 
     def setup() {
         registerService "schemaStore", ModelSchemaStore, schemaStore
@@ -65,6 +68,10 @@ class ProjectRegistrySpec extends Specification {
 
     protected NodeInitializerRegistry createNodeInitializerRegistry() {
         return NODE_INITIALIZER_REGISTRY
+    }
+
+    protected ManagedStructBindingStore createBindingStore() {
+        return BINDING_STORE
     }
 
     protected <T> void registerService(String path, Class<T> type, T instance) {
