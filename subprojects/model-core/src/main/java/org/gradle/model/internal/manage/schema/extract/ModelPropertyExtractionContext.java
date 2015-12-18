@@ -42,11 +42,12 @@ public class ModelPropertyExtractionContext {
     }
 
     public void addAccessor(PropertyAccessorExtractionContext accessor) {
-        PropertyAccessorRole type = accessor.getRole();
-        if (accessors.containsKey(type)) {
-            throw new IllegalStateException("Accessor already registered: " + type + " " + accessor);
-        }
-        accessors.put(type, accessor);
+        PropertyAccessorRole role = accessor.getRole();
+        // TODO:LPTR What happens when the property has multiple accessors in the same role but with different type?
+//        if (accessors.containsKey(role)) {
+//            throw new IllegalStateException("Accessor already registered: " + role + " " + accessor);
+//        }
+        accessors.put(role, accessor);
     }
 
     @Nullable
