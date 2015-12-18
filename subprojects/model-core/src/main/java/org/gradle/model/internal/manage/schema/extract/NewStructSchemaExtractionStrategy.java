@@ -24,6 +24,7 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.*;
 import org.gradle.api.Action;
 import org.gradle.model.Unmanaged;
+import org.gradle.model.internal.core.UnmanagedStruct;
 import org.gradle.model.internal.manage.schema.ModelSchema;
 import org.gradle.model.internal.manage.schema.NewModelProperty;
 import org.gradle.model.internal.manage.schema.NewStructSchema;
@@ -72,7 +73,7 @@ public class NewStructSchemaExtractionStrategy implements ModelSchemaExtractionS
             }
         });
 
-        extractionContext.found(new NewStructSchema<T>(type, properties, nonPropertyMethods, aspects, false));
+        extractionContext.found(new NewStructSchema<T>(type, properties, nonPropertyMethods, aspects, type.isAnnotationPresent(UnmanagedStruct.class)));
     }
 
     private Collection<ModelPropertyExtractionContext> identifyPotentialProperties(Multimap<Wrapper<Method>, Method> allMethods, ImmutableCollection.Builder<Method> nonPropertyMethods) {
